@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+COLOR_RED='\033[0;31m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_GREEN='\033[0;32m'
+COLOR_BLUE='\033[0;34m'
+COLOR_RESET='\033[0m'
+
+SCRIPT_DIR=$(dirname $(readlink -f $0))
+
+# DEPENDENCIES #
+# This script will install the dependencies for the dotfiles we assume that
+# you already have hyprland installed
+
+echo -e "${COLOR_BLUE}Installing dependencies...${COLOR_RESET}"
+
+DISTRO=$(cat /etc/os-release | grep -oP '(?<=^ID=).+' | tr -d '"')
+case "$DISTRO" in
+    "artix")
+        echo -e "${COLOR_BLUE}Installing dependencies for Arch Linux...${COLOR_RESET}"
+        $SCRIPT_DIR/distro/arch
+        ;;
+    "manjaro")
+        echo -e "${COLOR_BLUE}Installing dependencies for Manjaro...${COLOR_RESET}"
+        $SCRIPT_DIR/distro/arch
+        ;;
+    *)
+        echo -e "${COLOR_RED}Unsupported distro: $DISTRO${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}You can raise an issue at https://github.com/alexjercan/hyprland.dotfiles/issues to add support for your distro${COLOR_RESET}"
+        exit 1
+esac
+
+# HYPRLAND CONFIG #
+
+HYPR_DIR=$SCRIPT_DIR/hypr
+AUTONAME_DIR=$SCRIPT_DIR/hyprland-autoname-workspaces
+
+echo -e "${COLOR_BLUE}Setting up config files...${COLOR_RESET}"
+
+### Set the config files ###
+read -n1 -rep 'Would you like to copy config files? This will overwrite any existing config files. (y,n)' CFG
+if [[ $CFG == "Y" || $CFG == "y" ]]; then
+    # Remove the old config
+    unlink ~/.config/hypr 2> /dev/null || rm -rf ~/.config/hypr
+
+    # Set the config to the default
+    cp $HYPR_DIR/hyprland.default.conf $HYPR_DIR/hyprland.conf
+    ln -s $HYPR_DIR ~/.config/hypr
+
+    # Set the autoname config
+    unlink ~/.config/hyprland-autoname-workspaces 2> /dev/null || rm -rf ~/.config/hyprland-autoname-workspaces
+    ln -s $AUTONAME_DIR ~/.config/hyprland-autoname-workspaces
+fi
+
+### Shell settings ###
+
+CURRENT_SHELL=$(echo $SHELL | grep -oP '(?<=/bin/).+')
+if [[ $CURRENT_SHELL != "fish" ]]; then
+    read -n1 -rep 'Would you like to set the default shell to fish? (y,n)' SETSHELL
+    if [[ $SETSHELL == "Y" || $SETSHELL == "y" ]]; then
+         chsh -s /usr/bin/fish
+    fi
+fi
+
+### Set the theme ###
+
+echo -e "${COLOR_BLUE}Setting up theme...${COLOR_RESET}"
+
+read -n1 -rep 'Would you like to install hyprtheme? (y,n)' INSTHT
+if [[ $INSTHT == "Y" || $INSTHT == "y" ]]; then
+    if [[ ! -x "$(command -v cargo)" ]];
+    then
+        read -n1 -rep 'Cargo is not installed, but is required for hyprtheme. Would you like to install it using rustup? (y,n)' INSTCARGO
+        if [[ $INSTCARGO == "Y" || $INSTCARGO == "y" ]]; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+            source "$HOME/.cargo/env"
+        else
+            echo -e "${COLOR_RED}Cargo is required for hyprtheme. Please install it and run this script again.${COLOR_RESET}"
+        fi
+    fi
+
+    if [[ -x "$(command -v cargo)" ]];
+    then
+        mkdir -p ~/.cache/hyprtheme
+        git clone https://github.com/hyprland-community/hyprtheme ~/.cache/hyprtheme
+        cd ~/.cache/hyprtheme
+        make all
+        cd -
+    fi
+fi
+
+if [[ -x "$(command -v hyprtheme)" ]];
+then
+    # Set the theme to nothing; just create the directory
+    mkdir -p ~/.config/hypr/themes/
+    touch ~/.config/hypr/themes/hyprtheme.conf
+
+    hyprtheme init
+
+    read -n1 -rep 'What theme would you like to set: default (0), breaking-bad (1), darker (2), gruvbox (3)?' THEME
+    if [[ $THEME == "1" ]]; then
+        git clone https://github.com/alexjercan/breakingbad-hyprland-theme.git ~/.config/hypr/themes/breakingbad
+        bash ~/.config/hypr/themes/breakingbad/install
+        hyprtheme enable breakingbad
+    elif [[ $THEME == "2" ]]; then
+        git clone https://github.com/alexjercan/darker-hyprland-theme.git ~/.config/hypr/themes/darker
+        bash ~/.config/hypr/themes/darker/install
+        hyprtheme enable darker
+    elif [[ $THEME == "3" ]]; then
+        git clone https://github.com/alexjercan/gruv-hyprland-theme.git ~/.config/hypr/themes/gruv
+        bash ~/.config/hypr/themes/gruv/install
+        hyprtheme enable gruv
+    else
+        bash ~/.config/hypr/themes/default/install
+        hyprtheme enable default
+    fi
+fi
+
+# INSTALLATION COMPLETE #
+
+echo -e "${COLOR_GREEN}Installation complete!${COLOR_RESET}"
+echo "You can now login into your hyprland session."
