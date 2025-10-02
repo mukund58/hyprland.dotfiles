@@ -4,7 +4,8 @@ THEME_DIR=$1
 
 # Set the wallpaper
 killall swaybg
-swaybg -m fill -c "#181818" &
+#swaybg -m fill -c "#181818" &
+#mpvpaper -o "no-audio --loop-playlist shuffle" ALL ~/pix/wall/3959398ae6bf586585abf22248e1ee6c.mp4
 
 # Enabe the dunst notification daemon
 killall dunst
